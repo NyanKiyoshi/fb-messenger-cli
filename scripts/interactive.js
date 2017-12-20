@@ -6,7 +6,6 @@ const search = require('./search.js');
 const Listeners = require('./listeners.js');
 const heading = require('./heading.js');
 const Settings = require('./settings.js');
-const open = require('open');
 
 const colors = require('colors');
 const safeColors = require('colors/safe');
@@ -397,8 +396,7 @@ InteractiveCli.prototype.handleCommands = function(command) {
                 if (att >= 0 && att < attsNo) {
                     const url = atts[att];
                     if (url) {
-                        open(url);
-                        console.log('Attachment now open in browser');
+			console.log('Attachment URL: ' + url);
                     } else {
                         console.log('Couldn\'t open attachement in browser');
                     }
