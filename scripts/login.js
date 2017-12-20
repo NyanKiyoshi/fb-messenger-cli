@@ -1,24 +1,84 @@
+const fs = require('fs');
 const crypt = require('./crypt.js');
 const readlineSync = require('readline-sync');
 const phantomjs = require('phantomjs-prebuilt');
 const path = require('path');
+
 let phantom;
 const DEBUG = true;
 
+const CREDS_FILENAME = ".credentials.json";
+
 Login = function() { };
 
-Login.prototype.execute = function(callback) {
-    const login = this;
-    const result = {};
 
-    result.email = readlineSync.question('Email: ');
-    result.password = readlineSync.question('Password: ', {hideEchoBack: true});
+function get_credentials(callback) {
+    var master_password = readlineSync.question(
+        'Current master password (empty to recreate data): ',
+    
+        {hideEchoBack: true}
+    );
+
+    // if no master password passed: just call the callback
+    if (!master_password) {
+        callback();
+        return;
+    }
+    
+    // otherwise: decipher
+    crypt.static_load(
+        // callback
+        (err, data) => {
+            var email, password;
+
+            // only handle if there is no error
+            // otherwise: ignore.
+            if (!err) {
+                data = JSON.parse(data);
+
+                email = data.email;
+                password = data.password;
+            }
+            else {
+                console.log(err);
+            }
+
+            callback(email, password);
+        },
+        
+        // filename to load
+        CREDS_FILENAME,
+
+        // master password to decipher the file
+        master_password
+    );
+}
+
+
+Login.prototype._login = function(callback, email=null, password=null) {
+    const login = this;
+
+    // if there is no email or password set
+    if (!(email && password)) {
+        email = readlineSync.question('Email: ');
+        password = readlineSync.question('Password: ', {hideEchoBack: true});
+
+        var master_password = readlineSync.question('Master password: ', {hideEchoBack: true});
+        crypt.save(
+            JSON.stringify({
+                email: email,
+                password: password
+            }),
+
+            CREDS_FILENAME, master_password
+        );
+    }
 
     console.log("Attempting login...");
 
     // This needs to stay "var" for phantomJS
     // TODO: change phantomJS to pupeteer
-    var arguments = [path.resolve(__dirname, 'phantom.js'), result.email, result.password];
+    var arguments = [path.resolve(__dirname, 'phantom.js'), email, password];
 
     phantom = new login.run_cmd( phantomjs.path, arguments, (err) => {
         if (err) return callback(err);
@@ -52,6 +112,11 @@ Login.prototype.execute = function(callback) {
             return callback(new Error('Bad Facebook credentials'));
         }
     });
+}
+
+
+Login.prototype.execute = function(callback) {
+    get_credentials((email, password) => { this._login(callback, email, password) });
 };
 
 Login.prototype.run_cmd = function(cmd, args, cb) {
